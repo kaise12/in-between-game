@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>In-Between: Multiplayer</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <audio id="bgm" src="music.mp3" loop></audio>
+
+    <div class="timer-container"><div id="timer-bar" class="timer-bar" style="width: 0%;"></div></div>
+
+    <div id="game-over-modal">
+        <div class="result-title" id="go-title">YOU WON!</div>
+        <div class="result-sub" id="go-sub">Opponent went bankrupt</div>
+        <button class="btn-rematch" onclick="game.requestRematch()">PLAY AGAIN</button>
+    </div>
+
+    <div id="landing-page">
+        <div class="bg-suit" style="left: 10%; animation-duration: 8s;">♠</div>
+        <div class="bg-suit" style="left: 80%; animation-duration: 12s; animation-delay: 2s;">♥</div>
+        <div class="bg-suit" style="left: 20%; animation-duration: 15s; animation-delay: 5s;">♣</div>
+        <div class="bg-suit" style="left: 70%; animation-duration: 9s; animation-delay: 1s;">♦</div>
+
+        <div class="title-container">
+            <h1 class="title-line-1">In-Between</h1>
+            <div class="title-line-2">Multiplayer PvP</div>
+        </div>
+        
+        <div class="identity-box">
+            <div class="avatar-selector">
+                <div class="avatar-opt selected" onclick="selectAvatar(this)">😎</div>
+                <div class="avatar-opt" onclick="selectAvatar(this)">🤠</div>
+                <div class="avatar-opt" onclick="selectAvatar(this)">😈</div>
+                <div class="avatar-opt" onclick="selectAvatar(this)">🤖</div>
+                <div class="avatar-opt" onclick="selectAvatar(this)">🐱</div>
+            </div>
+            <input type="text" id="input-nickname" class="input-name" placeholder="Enter Nickname" maxlength="10">
+        </div>
+
+        <div class="lobby-controls">
+            <button class="btn-start" onclick="createRoom()">Create Room</button>
+            <div class="row-inputs">
+                <input type="text" id="input-room-code" placeholder="CODE">
+                <button class="btn-start" style="margin:0; padding: 15px;" onclick="joinRoom()">Join</button>
+            </div>
+        </div>
+
+        <button class="btn-settings" style="margin-top:20px;" onclick="toggleSettings(true)">⚙ Settings</button>
+    </div>
+
+    <div id="settings-modal">
+        <div class="settings-box">
+            <div class="settings-title">Game Settings</div>
+            
+            <div class="setting-row">
+                <div class="setting-label">
+                    <span>Background Music</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="input-music" checked onchange="toggleMusic(this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label">
+                    <span>Sound Effects</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="input-sound" checked onchange="updateSettingsUI()">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <button class="btn-close-settings" onclick="toggleSettings(false)">Close</button>
+        </div>
+    </div>
+
+    <div id="create-modal">
+        <div class="create-box">
+            <div class="create-title">Room Rules</div>
+            
+            <div class="range-wrap">
+                <div class="range-label">Initial Pot (Ante) <span id="val-ante" class="range-val">50</span></div>
+                <input type="range" id="input-ante" class="range-input" min="50" max="500" step="50" value="50" 
+                       oninput="document.getElementById('val-ante').innerText = this.value">
+            </div>
+
+            <div class="range-wrap">
+                <div class="range-label">Pass Penalty <span id="val-penalty" class="range-val">10</span></div>
+                <input type="range" id="input-penalty" class="range-input" min="10" max="100" step="10" value="10"
+                       oninput="document.getElementById('val-penalty').innerText = this.value">
+            </div>
+
+            <button class="btn-confirm-create" onclick="confirmCreateRoom()">Start Game</button>
+            <button class="btn-cancel" onclick="toggleCreateModal(false)">Cancel</button>
+        </div>
+    </div>
+
+    <div id="game-wrapper">
+        <div class="room-display">Room: <span id="disp-room-id">---</span></div>
+
+        <div class="scoreboard">
+            <div class="score-box" id="p1-score-box">
+                <div class="chat-bubble" id="p1-bubble">Hello!</div> <small id="p1-name">Waiting...</small> <span id="p1-bank">1000</span>
+            </div>
+            <div class="score-box" id="p2-score-box">
+                <div class="chat-bubble" id="p2-bubble">Hi!</div> <small id="p2-name">Waiting...</small> <span id="p2-bank">1000</span>
+            </div>
+        </div>
+
+        <div class="game-area">
+            <div id="turn-indicator" class="turn-overlay">CPU Turn</div>
+            
+            <div class="pot-container" id="pot-display-area">
+                <div class="pot-label">THE POT</div>
+                <div class="pot-amount" id="pot-val">0</div>
+            </div>
+
+            <div class="deck-container" id="deck-anchor">
+                <div class="deck-card"></div>
+                <div class="deck-card"></div>
+                <div class="deck-card"></div>
+            </div>
+            
+            <div class="hand-area">
+                <div class="card-slot" id="slot-1"></div>
+                <div class="card-slot" id="slot-result"></div>
+                <div class="card-slot" id="slot-2"></div>
+            </div>
+            <div class="info-panel">
+                <div class="main-msg" id="msg-main">Welcome</div>
+                <div class="sub-msg" id="msg-sub">Press Start to begin</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div id="panel-deal">
+                <button class="btn-deal" id="btn-deal" onclick="game.startRound()">Start Round</button>
+            </div>
+            <div id="panel-bet" class="bet-ui">
+                <div class="slider-row">
+                    <span>Bet: <strong id="bet-val">5</strong></span>
+                    <input type="range" id="bet-slider" min="5" max="100" step="5" value="5">
+                    <button class="btn-all-in" onclick="game.setAllIn()">ALL IN!</button>
+                </div>
+                <div class="btn-row">
+                    <button class="btn-pass" id="btn-pass-action" onclick="game.playerAction(false)">PASS (-10)</button>
+                    <button class="btn-bet" onclick="game.playerAction(true)">BET</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <button class="chat-toggle" onclick="toggleChat()">💬</button>
+    <div class="chat-panel" id="chat-panel">
+        <div class="emote-grid">
+            <button class="btn-emote" onclick="sendChat('😂')">😂</button>
+            <button class="btn-emote" onclick="sendChat('😡')">😡</button>
+            <button class="btn-emote" onclick="sendChat('😱')">😱</button>
+            <button class="btn-emote" onclick="sendChat('🤑')">🤑</button>
+            <button class="btn-emote" onclick="sendChat('Hurry!')">Hurry!</button>
+            <button class="btn-emote" onclick="sendChat('GG!')">GG!</button>
+        </div>
+        <div class="chat-input-row">
+            <input type="text" id="chat-input" placeholder="..." maxlength="15">
+            <button class="btn-send" onclick="sendCustomChat()">➤</button>
+        </div>
+    </div>
+
+    <script src="client.js"></script>
+</body>
+</html>
