@@ -24,13 +24,46 @@ body {
     flex-direction: column;
 }
 
-/* TIMER BAR */
+/* --- ENHANCED TIMER BAR --- */
 .timer-container {
-    position: fixed; top: 0; left: 0; width: 100%; height: 10px;
-    background: rgba(0,0,0,0.8); z-index: 99999; border-bottom: 1px solid white;
+    position: fixed; 
+    top: 0; left: 0; 
+    width: 100%; 
+    height: 8px; /* Slightly thinner for sleek mobile look */
+    background: rgba(0,0,0,0.5); 
+    z-index: 99999; 
 }
+
 .timer-bar {
-    width: 100%; height: 100%; background: #f1c40f; transform-origin: left center;
+    width: 100%; 
+    height: 100%; 
+    background: #2ecc71; /* Default Green */
+    transform-origin: left center;
+    box-shadow: 0 0 10px rgba(46, 204, 113, 0.5); /* Glow */
+    
+    /* We will use a class to trigger the animation */
+    width: 0%; 
+}
+
+/* The actual animation class */
+.timer-active {
+    animation-name: timerShrink;
+    animation-timing-function: linear;
+    animation-fill-mode: forwards; /* Stay at 0% when done */
+}
+
+/* Keyframes: Green -> Yellow -> Red -> Empty */
+@keyframes timerShrink {
+    0% { width: 100%; background: #2ecc71; box-shadow: 0 0 15px #2ecc71; }
+    50% { background: #f1c40f; box-shadow: 0 0 15px #f1c40f; }
+    80% { background: #e74c3c; box-shadow: 0 0 20px #e74c3c; }
+    100% { width: 0%; background: #c0392b; }
+}
+
+/* Special High-Visibility Mode for "My Turn" */
+.timer-bar.urgent {
+    height: 12px; /* Thicker */
+    background: #f1c40f; /* Gold base */
 }
 
 /* LANDING PAGE */
@@ -113,97 +146,349 @@ input:checked + .slider:before { transform: translateX(24px); }
     color: white; border: none; border-radius: 50px; font-weight: bold; font-size: 1.1rem;
     cursor: pointer; text-transform: uppercase; box-shadow: 0 4px 10px rgba(0,0,0,0.3); margin-top: 10px;
 }
+/* CANCEL BUTTON (Polished) */
 .btn-cancel {
-    background: transparent; color: rgba(255,255,255,0.5); border: none; 
-    margin-top: 15px; cursor: pointer; text-decoration: underline;
+    width: 100%; /* Match the width of the Start button */
+    background: transparent;
+    color: #bdc3c7; /* Muted gray text */
+    border: 2px solid #7f8c8d; /* Subtle border */
+    padding: 12px;
+    border-radius: 50px;
+    font-weight: bold;
+    font-size: 1rem;
+    cursor: pointer;
+    text-transform: uppercase;
+    margin-top: 15px;
+    text-decoration: none;
+    transition: all 0.2s ease;
 }
 
-/* GAME UI */
-#game-wrapper { display: none; height: 100%; width: 100%; flex-direction: column; opacity: 0; transition: opacity 0.5s; }
+.btn-cancel:hover {
+    color: white;
+    border-color: white;
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
+}
 
-.scoreboard { display: flex; justify-content: space-between; padding: 10px 20px; background: rgba(0,0,0,0.4); z-index: 20; position: relative; }
-.score-box { text-align: center; position: relative; width: 100px; }
-.score-box small { display: block; font-size: 0.7rem; opacity: 0.8; text-transform: uppercase; }
-.score-box span { font-size: 1.2rem; color: var(--gold); font-weight: bold; }
+.btn-cancel:active {
+    transform: scale(0.95);
+    background: rgba(255, 255, 255, 0.05);
+}
 
-/* ROOM DISPLAY */
+/* --- TABLE CONTAINER --- */
+#game-wrapper {
+    display: none; height: 100%; width: 100%; 
+    position: relative; overflow: hidden;
+    opacity: 0; transition: opacity 0.5s;
+}
+
+/* ROOM DISPLAY (Added Missing Interaction) */
 .room-display {
-    position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.6); padding: 5px 20px; border-radius: 20px;
-    font-weight: bold; color: var(--gold); z-index: 100;
-    border: 1px solid rgba(255, 215, 0, 0.3); font-size: 0.9rem;
-    letter-spacing: 2px; pointer-events: none;
+    position: absolute; 
+    top: 15px; 
+    left: 50%; 
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.6); 
+    padding: 5px 20px; 
+    border-radius: 20px;
+    font-weight: bold; 
+    color: var(--gold);
+    z-index: 100;
+    border: 1px solid rgba(255, 215, 0, 0.3); 
+    font-size: 0.9rem;
+    letter-spacing: 2px;
+    
+    /* Allow text selection for copying */
+    pointer-events: auto; 
+    cursor: text;
 }
 
-/* CHAT BUBBLES */
-.chat-bubble {
-    position: absolute; top: 55px; left: 50%; transform: translateX(-50%) scale(0);
-    background: white; color: #333; padding: 8px 15px; border-radius: 15px;
-    font-weight: bold; font-size: 0.9rem; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-    white-space: nowrap; z-index: 105; transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    pointer-events: none;
+/* The Green Felt Area */
+.poker-table {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -60%); /* Moved up slightly to make room for controls */
+    width: 95%;
+    height: 60%; /* Occupies middle 60% of screen */
+    border: 5px solid #145a32;
+    border-radius: 100px; /* Oval Shape */
+    background: rgba(0,0,0,0.1);
+    box-shadow: inset 0 0 50px rgba(0,0,0,0.5);
 }
-.chat-bubble:after { 
-    content: ''; position: absolute; top: -6px; left: 50%; margin-left: -6px;
-    border-width: 0 6px 6px; border-style: solid; border-color: transparent transparent white transparent;
+
+/* --- SEATS (6 Positions) --- */
+.seat {
+    position: absolute;
+    width: 80px; height: 80px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    transition: all 0.3s;
 }
-.chat-bubble.show { transform: translateX(-50%) scale(1); }
 
-/* POT UI */
-.pot-container {
-    position: absolute; top: 45%; left: 50%; transform: translate(-50%, -100%);
-    text-align: center; z-index: 10;
+/* Avatar Circle */
+.seat-avatar {
+    width: 60px; height: 60px;
+    background: #34495e;
+    border: 3px solid #7f8c8d;
+    border-radius: 50%;
+    font-size: 2rem;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+    position: relative;
+    z-index: 2;
 }
-.pot-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; opacity: 0.8; }
-.pot-amount { 
-    font-size: 2rem; font-weight: 900; color: var(--gold); 
-    text-shadow: 0 0 10px rgba(255, 215, 0, 0.5), 2px 2px 0px black;
-    background: rgba(0,0,0,0.5); padding: 5px 25px; border-radius: 30px;
-    border: 2px solid var(--gold); animation: pulsePot 2s infinite;
+.seat.active .seat-avatar { border-color: var(--gold); box-shadow: 0 0 15px var(--gold); }
+.seat.empty .seat-avatar { opacity: 0.3; border-style: dashed; }
+
+/* Player Info (Name/Money) */
+.seat-info {
+    background: rgba(0,0,0,0.8);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    text-align: center;
+    margin-top: -10px; /* Overlap avatar slightly */
+    z-index: 3;
+    border: 1px solid #555;
+    min-width: 70px;
 }
-@keyframes pulsePot { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+.seat-name { display: block; font-weight: bold; color: #ddd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60px; }
+.seat-money { display: block; color: var(--gold); font-weight: bold; }
 
-.game-area { flex: 1; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+/* --- POSITIONING THE 6 SEATS --- */
+/* Seat 0: HERO (Bottom Center) */
+.seat-0 { bottom: -20px; left: 50%; transform: translateX(-50%); }
 
-/* DECK & CARDS */
-.deck-container { position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%); width: 80px; height: 110px; z-index: 5; }
-.deck-card { width: 100%; height: 100%; background: repeating-linear-gradient(45deg, #c0392b, #c0392b 10px, #e74c3c 10px, #e74c3c 20px); border: 2px solid white; border-radius: 8px; position: absolute; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
-.deck-card:nth-child(1) { transform: translate(0, 0); }
-.deck-card:nth-child(2) { transform: translate(-2px, -2px); }
-.deck-card:nth-child(3) { transform: translate(-4px, -4px); }
+/* Seat 1: Bottom Left */
+.seat-1 { bottom: 20%; left: -10px; }
 
-.hand-area { width: 100%; max-width: 500px; display: flex; justify-content: space-between; padding: 0 20px; z-index: 2; }
-.card-slot { width: 30%; aspect-ratio: 2.5/3.5; background: rgba(0,0,0,0.2); border: 2px dashed rgba(255,255,255,0.2); border-radius: 8px; position: relative; }
+/* Seat 2: Top Left */
+.seat-2 { top: 10%; left: -10px; }
 
-.card { width: 100%; height: 100%; background: var(--card-white); border-radius: 6px; color: var(--text-dark); display: flex; flex-direction: column; justify-content: space-between; padding: 5px; font-weight: bold; font-size: 1.2rem; box-shadow: 0 4px 10px rgba(0,0,0,0.3); position: absolute; top: 0; left: 0; }
+/* Seat 3: Top Center (Main Villain) */
+.seat-3 { top: -40px; left: 50%; transform: translateX(-50%); }
+
+/* Seat 4: Top Right */
+.seat-4 { top: 10%; right: -10px; }
+
+/* Seat 5: Bottom Right */
+.seat-5 { bottom: 20%; right: -10px; }
+
+
+/* --- CENTER AREA (Pot & Cards) --- */
+/* UPDATED CARD SIZES */
+:root {
+    --card-w: 70px;  /* Requested Width */
+    --card-h: 90px;  /* Requested Height */
+    --card-font: 1.2rem; /* Increased font to match bigger card */
+}
+
+/* On Mobile, shrink proportionally */
+@media (max-width: 600px) {
+    :root {
+        --card-w: 55px; /* ~70% of desktop */
+        --card-h: 75px; /* ~70% of desktop */
+        --card-font: 0.9rem;
+    }
+}
+
+.center-area {
+    position: absolute;
+    top: 40%; /* Changed from 50% to 40% to make room at the bottom */
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 280px; 
+    height: 160px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    pointer-events: none; 
+}
+
+.pot-container { position: relative; margin-bottom: 15px; text-align: center; }
+.pot-label { font-size: 0.7rem; opacity: 0.7; letter-spacing: 1px; }
+.pot-amount { font-size: 1.5rem; color: var(--gold); font-weight: bold; text-shadow: 0 2px 2px black; }
+
+.community-cards {
+    display: flex; gap: 15px; /* More space between cards */
+    position: relative; 
+    height: var(--card-h); 
+    width: 100%; justify-content: center;
+}
+
+/* Card placeholders on table */
+.table-card-slot {
+    width: var(--card-w); height: var(--card-h);
+    background: rgba(0,0,0,0.2);
+    border: 2px dashed rgba(255,255,255,0.2);
+    border-radius: 5px;
+    position: relative;
+}
+
+/* DECK (Moved: Center Below Community Cards) */
+.deck-stack {
+    position: absolute;
+    
+    /* Center Horizontally */
+    left: 50%; 
+    
+    /* Position Below the Center Container */
+    top: 100%; 
+    right: auto; /* Reset */
+    
+    /* Center X axis, and push down 15px for spacing */
+    transform: translate(-50%, 15px);
+    
+    width: var(--card-w); height: var(--card-h);
+    background: repeating-linear-gradient(45deg, #c0392b, #c0392b 5px, #a93226 5px, #a93226 10px);
+    border: 2px solid white; border-radius: 5px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.4); /* Slight shadow for depth */
+}
+
+/* DECK CONTAINER (For JS Animation Reference) */
+.deck-container { 
+    position: absolute; top: 60%; left: 50%; 
+    width: 1px; height: 1px; opacity: 0; /* Hide original container, we use deck-stack now */
+}
+
+/* --- CARD STYLING (Fixed "Half" Issue) --- */
+.card { 
+    width: 100%; height: 100%; 
+    background: var(--card-white); border-radius: 4px; 
+    color: var(--text-dark); 
+    display: flex; flex-direction: column; justify-content: space-between; 
+    padding: 2px 4px; /* Reduced padding */
+    font-weight: bold; 
+    font-size: var(--card-font); /* Responsive Font */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3); 
+    overflow: hidden; /* Prevents overflow */
+}
 .card.red { color: #c0392b; }
 .card.black { color: #2c3e50; }
-.card-center { font-size: 2rem; align-self: center; margin-top: auto; margin-bottom: auto;}
+
+.card-center { 
+    font-size: 1.4em; /* Relative to card font */
+    align-self: center; 
+    margin-top: -5px; /* Pull center up slightly */
+}
+.card-corner { line-height: 0.9; }
+.card-corner span { display: block; font-size: 0.7em; }
 .card-corner.bottom { transform: rotate(180deg); }
 
-/* ANIMATIONS */
-.flying-card { position: absolute; width: 80px; height: 110px; background: repeating-linear-gradient(45deg, #c0392b, #c0392b 10px, #e74c3c 10px, #e74c3c 20px); border: 2px solid white; border-radius: 8px; z-index: 100; transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94); box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
-
-.flying-chip {
-    position: absolute; width: 30px; height: 30px;
-    background: radial-gradient(circle at 30% 30%, #e74c3c, #c0392b);
-    border: 4px dashed white; border-radius: 50%;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.4); z-index: 100;
-    transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+/* --- ANIMATIONS (Fixed "Big" Issue) --- */
+.flying-card { 
+    position: absolute; 
+    width: var(--card-w) !important;  /* Force match slot size */
+    height: var(--card-h) !important; /* Force match slot size */
+    background: repeating-linear-gradient(45deg, #c0392b, #c0392b 5px, #e74c3c 5px, #e74c3c 10px); 
+    border: 2px solid white; border-radius: 4px; 
+    z-index: 100; 
+    transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94); 
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3); 
 }
 
+/* INFO PANEL */
 .info-panel { min-height: 60px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 10px; margin-top: auto; margin-bottom: 20px; }
 .main-msg { font-size: 1.2rem; font-weight: bold; text-shadow: 1px 1px 2px black; }
 .sub-msg { font-size: 0.9rem; opacity: 0.8; }
 
+/* Hide Start Button by default */
+#panel-deal {
+    display: none;
+}
+
+/* --- CONTROLS (WAS MISSING - RE-ADDED) --- */
 .controls { 
-    background: var(--felt-dark); padding: 20px 20px 40px 20px; 
+    position: absolute; 
+    bottom: 0; 
+    left: 0; 
+    width: 100%;
+    z-index: 50; /* IMPORTANT: Above table */
+    
+    background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+    padding: 20px 20px 40px 20px; 
     padding-bottom: calc(40px + env(safe-area-inset-bottom));
-    border-top: 1px solid rgba(255,255,255,0.1); width: 100%;
+}
+
+/* --- IMPROVED BETTING UI --- */
+
+/* The Container */
+.bet-ui { 
+    display: none; 
+    width: 100%; 
+    max-width: 500px; /* Prevent it from getting too wide on desktop */
+    margin: 0 auto;   /* Center it */
+    animation: slideUp 0.3s ease; 
+}
+
+/* Row 1: Text Display */
+.bet-info-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    font-size: 1.1rem;
+    color: var(--gold);
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
+.bet-number {
+    font-size: 1.5rem;
+    font-weight: 900;
+    color: white;
+    min-width: 60px; /* Reserve space so text doesn't jump */
+    text-align: center;
+}
+
+/* Row 2: Slider + All In */
+.slider-row { 
+    display: flex; 
+    align-items: center; 
+    gap: 15px; 
+    margin-bottom: 15px; 
+    background: rgba(0,0,0,0.3); /* Dark backing for controls */
+    padding: 10px;
+    border-radius: 50px;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* The Slider takes all remaining space */
+#bet-slider {
+    flex: 1; 
+    cursor: pointer;
+    accent-color: var(--success); /* Matches green theme */
+    height: 6px;
+}
+
+/* The All-In Button (Fixed, Stable) */
+.btn-all-in {
+    background: linear-gradient(135deg, #f1c40f, #d35400); 
+    color: white;
+    border: none; 
+    padding: 8px 16px; 
+    font-size: 0.8rem; 
+    font-weight: 900;
+    border-radius: 20px; 
+    cursor: pointer; 
+    white-space: nowrap; 
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3); 
+    transition: transform 0.1s;
+}
+
+.btn-all-in:active { transform: scale(0.95); }
+
+/* Row 3: Action Buttons (Tweaked) */
+.btn-row { 
+    display: flex; 
+    gap: 15px; 
+}
+
+.btn-bet, .btn-pass {
+    border-radius: 50px; /* Rounder buttons look more modern */
+    font-size: 1.1rem;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
 }
 
 .bet-ui { display: none; width: 100%; animation: slideUp 0.3s ease; }
-.slider-row { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
 .btn-row { display: flex; gap: 10px; margin-top: 10px; }
 button { border: none; padding: 15px; border-radius: 8px; font-size: 1rem; font-weight: bold; text-transform: uppercase; cursor: pointer; box-shadow: 0 4px 0 rgba(0,0,0,0.2); transition: transform 0.1s; }
 button:active { transform: translateY(4px); box-shadow: none; }
@@ -211,13 +496,6 @@ button:active { transform: translateY(4px); box-shadow: none; }
 .btn-bet { flex: 1; background: var(--success); color: white; border: 2px solid white; }
 .btn-pass { flex: 1; background: var(--danger); color: white; border: 2px solid white; }
 
-.btn-all-in {
-    background: linear-gradient(135deg, #f1c40f, #f39c12); color: #2c3e50;
-    border: 1px solid white; padding: 5px 10px; font-size: 0.8rem; font-weight: 900;
-    border-radius: 5px; cursor: pointer; white-space: nowrap; margin-left: 10px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.3); animation: pulseBtn 2s infinite;
-}
-.btn-all-in:active { transform: scale(0.95); }
 
 .turn-overlay { position: absolute; top: 100px; background: rgba(0,0,0,0.7); padding: 5px 15px; border-radius: 20px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; pointer-events: none; transition: opacity 0.3s; opacity: 0; }
 .shuffle-anim { animation: shake 0.5s ease-in-out; }
@@ -260,13 +538,13 @@ button:active { transform: translateY(4px); box-shadow: none; }
 
 /* CHAT CONTROLS */
 .chat-toggle {
-    position: fixed; bottom: 160px; right: 20px;
+    position: fixed; bottom: 170px; right: 20px;
     width: 50px; height: 50px; border-radius: 50%;
     background: var(--gold); border: 2px solid white;
     font-size: 1.5rem; cursor: pointer; z-index: 200;
     box-shadow: 0 5px 15px rgba(0,0,0,0.3); transition: transform 0.1s;
     display: flex; justify-content: center; align-items: center;
-    padding-bottom: 5px;
+    padding-bottom: 15px;
 }
 .chat-toggle:active { transform: scale(0.9); }
 
@@ -283,6 +561,81 @@ button:active { transform: translateY(4px); box-shadow: none; }
 #chat-input { flex: 1; padding: 8px; border-radius: 5px; border: none; outline: none; }
 .btn-send { background: var(--success); color: white; border: none; padding: 0 15px; border-radius: 5px; font-weight: bold; cursor: pointer; }
 
+
+/* --- CHAT BUBBLE (Big & Aligned to Face) --- */
+
+/* 1. Default Style: Pops to the RIGHT */
+.chat-bubble {
+    position: absolute;
+    /* ALIGNMENT FIX: 30px is exactly half the avatar height (60px) */
+    top: 30px;           
+    left: 75px;         /* Pushed further out for clearance */
+    right: auto;
+    
+    transform: translateY(-50%) scale(0); /* Vertically centered on the 30px line */
+    
+    background: white;
+    color: #2c3e50;
+    
+    /* SIZE FIX: Bigger font and padding */
+    padding: 12px 18px; 
+    font-size: 1.1rem;  
+    
+    border-radius: 20px;
+    border-top-left-radius: 4px; /* Sharp corner near mouth */
+    font-weight: bold;
+    white-space: nowrap;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    z-index: 100;
+    
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    pointer-events: none;
+}
+
+/* 2. Default Arrow: Points LEFT */
+.chat-bubble::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: -8px;         /* Slightly larger arrow */
+    right: auto;
+    transform: translateY(-50%);
+    
+    /* Triangle pointing Left */
+    border-width: 8px 8px 8px 0;
+    border-style: solid;
+    border-color: transparent white transparent transparent;
+}
+
+/* 3. SHOW STATE */
+.chat-bubble.show {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+}
+
+/* --- SMART OVERRIDES (Right Side Seats) --- */
+
+/* 4. Right-Side Seats (4 & 5): Pop to the LEFT */
+.seat-4 .chat-bubble, 
+.seat-5 .chat-bubble {
+    left: auto;         
+    right: 75px;        /* Pushed out to Left */
+    border-top-left-radius: 20px;
+    border-top-right-radius: 4px; /* Sharp corner flip */
+}
+
+/* 5. Right-Side Arrow: Points RIGHT */
+.seat-4 .chat-bubble::after, 
+.seat-5 .chat-bubble::after {
+    left: auto;         
+    right: -8px;        
+    
+    /* Triangle pointing Right */
+    border-width: 8px 0 8px 8px;
+    border-color: transparent transparent transparent white;
+}
+
 /* CONFETTI */
 .confetti {
     position: fixed; width: 12px; height: 12px; top: -20px;
@@ -293,4 +646,234 @@ button:active { transform: translateY(4px); box-shadow: none; }
     0% { transform: translateY(0) rotate(0deg); opacity: 1; }
     80% { opacity: 1; }
     100% { transform: translateY(105vh) rotate(720deg); opacity: 0; }
+}
+
+/* Add to your CSS */
+.seat.bankrupt {
+    filter: grayscale(100%); /* Makes avatar black & white */
+    opacity: 0.5;            /* Fades them out */
+    pointer-events: none;    /* Prevents clicking on them */
+}
+
+.seat.bankrupt .seat-name {
+    text-decoration: line-through;
+    color: #ff4444; /* Red color to indicate out */
+}
+
+.seat.bankrupt .seat-money {
+    color: #ff4444;
+    font-weight: bold;
+}
+
+/* FLOATING MONEY TEXT (New) */
+.floating-text {
+    position: absolute;
+    font-size: 1.2rem;
+    font-weight: bold;
+    pointer-events: none;
+    z-index: 10;
+    text-shadow: 0 2px 2px rgba(0,0,0,0.8);
+    animation: floatUpFade 1.5s forwards;
+}
+
+.floating-text.gain { color: #2ecc71; } /* Green */
+.floating-text.loss { color: #e74c3c; } /* Red */
+
+@keyframes floatUpFade {
+    0% { transform: translateY(0); opacity: 1; }
+    100% { transform: translateY(-40px); opacity: 0; }
+}
+
+/* POT CHIP PILE (Visual Enhancement) */
+#pot-display-area {
+    position: relative;
+    width: 60px; height: 60px;
+    margin: 0 auto 5px auto;
+    /* We can use a background image or CSS to make it look like a pile later */
+}
+
+/* FLYING CHIP ANIMATION (Was Missing) */
+.flying-chip {
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    background: radial-gradient(circle at 30% 30%, #f1c40f, #d35400); /* Gold Gradient */
+    border: 2px dashed #fff;
+    border-radius: 50%;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+    z-index: 200; /* Ensure it flies ABOVE the cards and table */
+    pointer-events: none;
+    transition: all 0.6s ease-in-out; /* Smooth flight */
+}
+
+/* LEAVE BUTTON (Aligned with Room ID) */
+.btn-leave {
+    position: absolute;
+    top: 15px;          /* Match the Room Display (was 25px) */
+    left: 15px;
+    
+    background: rgba(0, 0, 0, 0.6); /* Slightly darker to match Room Display */
+    color: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    
+    /* Dimensions to match visual weight of Room Display */
+    padding: 6px 15px;  
+    height: 32px;       /* Fixed height ensures perfect vertical centering */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: bold;
+    cursor: pointer;
+    z-index: 200;
+    transition: all 0.2s ease;
+}
+
+.btn-leave:active,
+.btn-leave:hover {
+    background: rgba(192, 57, 43, 0.9);
+    color: white;
+    border-color: #e74c3c;
+    transform: scale(0.95);
+}
+
+/* --- TOAST NOTIFICATIONS --- */
+#notification-area {
+    position: absolute;
+    top: 60px; /* Below the Leave button */
+    left: 15px;
+    width: 250px;
+    z-index: 9999;
+    pointer-events: none; /* Let clicks pass through */
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.toast {
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 10px 15px;
+    border-left: 4px solid var(--gold); /* Gold strip on left */
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    
+    /* Animation: Slide In -> Wait -> Fade Out */
+    animation: slideInLeft 0.5s ease-out forwards, fadeOut 0.5s ease-in 3.5s forwards;
+    opacity: 0; /* Start invisible (handled by animation) */
+}
+
+/* Success variant (Green) */
+.toast.success { border-left-color: var(--success); }
+
+/* Error/Leave variant (Red) */
+.toast.error { border-left-color: var(--danger); }
+
+@keyframes slideInLeft {
+    from { opacity: 0; transform: translateX(-100%); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+/* FOOTER CREDIT (Subtle & Elegant) */
+.footer-credit {
+    position: absolute;
+    bottom: 20px;
+    width: 100%;
+    text-align: center;
+    font-size: 0.75rem; /* Small but readable */
+    color: rgba(255, 255, 255, 0.4); /* Low contrast to not distract */
+    font-family: 'Segoe UI', sans-serif;
+    letter-spacing: 0.5px;
+    pointer-events: auto;
+}
+
+/* Optional: Make the name slightly brighter on hover */
+.footer-credit a {
+    color: rgba(255, 255, 255, 0.6);
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.3s ease;
+}
+
+.footer-credit a:hover {
+    color: var(--gold); /* Gold glow on hover */
+}
+
+/* --- GAME LOGO & BRANDING --- */
+
+
+/* 2. Pinoy Version Text */
+.title-line-2 {
+    margin-top: 10px;
+    animation: slideUp 1s;
+}
+
+.pinoy-badge {
+    display: inline-block;
+    background: rgba(0, 0, 0, 0.4);
+    color: #f1c40f; /* Gold Text */
+    border: 1px solid rgba(241, 196, 15, 0.3);
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 1.2rem;
+    font-family: 'Segoe UI', sans-serif; /* Clean font */
+    font-weight: bold;
+    letter-spacing: 2px;
+    text-shadow: 0 2px 2px black;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+
+/* Optional: Make the badge glow on hover */
+.pinoy-badge:hover {
+    background: rgba(241, 196, 15, 0.2);
+    color: white;
+    border-color: white;
+    cursor: default;
+}
+
+/* ONLINE USERS INDICATOR (Landing Page) */
+.online-indicator {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    
+    background: rgba(0, 0, 0, 0.4); /* Dark glass effect */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 6px 12px;
+    border-radius: 20px;
+    
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.85rem;
+    font-weight: bold;
+    font-family: 'Segoe UI', sans-serif;
+    pointer-events: none; /* Non-interactive */
+}
+
+/* The Pulsing Green Dot */
+.online-dot {
+    width: 8px;
+    height: 8px;
+    background-color: #2ecc71; /* Green */
+    border-radius: 50%;
+    box-shadow: 0 0 5px #2ecc71;
+    animation: pulseDot 2s infinite;
+}
+
+@keyframes pulseDot {
+    0% { transform: scale(0.95); opacity: 0.7; }
+    50% { transform: scale(1.2); opacity: 1; box-shadow: 0 0 10px #2ecc71; }
+    100% { transform: scale(0.95); opacity: 0.7; }
 }

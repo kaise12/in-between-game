@@ -35,128 +35,184 @@ class Deck {
     draw() { if(this.cards.length === 0) this.reset(); return this.cards.pop(); }
 }
 
-// --- ROOM CLASS (The Game Instance) ---
+
+/// --- ROOM CLASS (6-Player Logic) ---
 class GameRoom {
-    constructor(roomId, io, config = {}) { // Accept config
+    constructor(roomId, io, config = {}, hostId) {
         this.roomId = roomId;
         this.io = io;
-        this.players = {};
+        this.hostId = hostId;
         this.turnTimer = null;
         
-        // USE CUSTOM CONFIG OR DEFAULTS
+        this.seats = [null, null, null, null, null, null]; 
+
         this.gameState = {
             deck: new Deck(),
             pot: 0,
-            ante: config.ante || 50,       // Custom Ante
-            penalty: config.penalty || 10, // Custom Penalty
+            ante: config.ante || 50,
+            penalty: config.penalty || 10,
             card1: null,
             card2: null,
-            activePlayer: 'p1', 
-            firstPlayer: 'p1',
+            activeSeat: -1, 
+            dealerSeat: 0, 
             turnDuration: 15,
+            isRoundActive: false 
         };
     }
 
     addPlayer(socket, userData) {
-        if (Object.keys(this.players).length >= 2) return false;
-
-        const role = Object.values(this.players).find(p => p.role === 'p1') ? 'p2' : 'p1';
-        this.players[socket.id] = {
+        if (this.seats.filter(s => s !== null).length >= 6) return false;
+        const existingSeat = this.seats.findIndex(s => s && s.id === socket.id);
+        if(existingSeat !== -1) return true;
+        const seatIndex = this.seats.findIndex(s => s === null);
+        
+        this.seats[seatIndex] = {
             id: socket.id,
-            role: role,
             name: userData.name.substring(0, 10),
             avatar: userData.avatar,
-            money: 1000
+            money: 1000,
+            seatIndex: seatIndex 
         };
 
-        socket.join(this.roomId); // Socket.io Room Logic
-        socket.data.roomId = this.roomId; // Tag the socket
-        
-        socket.emit('welcome', { role: role, roomId: this.roomId });
-        this.broadcastPlayerUpdate();
+        socket.join(this.roomId);
+        socket.data.roomId = this.roomId;
+        socket.data.seatIndex = seatIndex; 
 
-        if (Object.keys(this.players).length === 2) {
-            let p1 = Object.values(this.players).find(p => p.role === 'p1');
-            let p2 = Object.values(this.players).find(p => p.role === 'p2');
-            this.io.to(this.roomId).emit('game_ready', `${p1.name} vs ${p2.name}! Ready.`);
-        }
+        // NEW: Notify everyone ELSE that someone joined
+        socket.broadcast.to(this.roomId).emit('notification', {
+            msg: `${userData.name} joined the table!`,
+            type: 'success'
+        });
+
+        socket.emit('welcome', { seatIndex: seatIndex, roomId: this.roomId, hostId: this.hostId });
+        this.broadcastState();
         return true;
     }
 
     removePlayer(socketId) {
-        delete this.players[socketId];
-        this.gameState.pot = 0;
-        clearTimeout(this.turnTimer);
-        this.io.to(this.roomId).emit('reset_game'); // Kick other player to lobby or reset
-        this.broadcastPlayerUpdate();
+        const index = this.seats.findIndex(s => s && s.id === socketId);
+        if(index !== -1) {
+            const name = this.seats[index].name; 
+            
+            this.seats[index] = null;
+
+            // Notify table
+            this.io.to(this.roomId).emit('notification', {
+                msg: `${name} left the table.`,
+                type: 'error'
+            });
+
+            // --- CRITICAL FIX: Prevent freeze if Active Player leaves ---
+            if (this.gameState.isRoundActive && index === this.gameState.activeSeat) {
+                clearTimeout(this.turnTimer); // Stop the timer
+
+                // Check for last man standing immediately
+                const survivors = this.seats.filter(s => s !== null && s.money > 0);
+                if (survivors.length < 2) {
+                     this.endRound(-1, "Opponent Left"); // Game over
+                } else {
+                    // Move to next player
+                    const nextSeat = this.getNextSeat(this.gameState.activeSeat);
+                    this.gameState.activeSeat = nextSeat;
+                    setTimeout(() => { this.dealHand(false); }, 1000);
+                }
+            }
+            // ------------------------------------------------------------
+
+            this.broadcastState();
+        }
     }
 
-    broadcastPlayerUpdate() {
-        let p1 = Object.values(this.players).find(p => p.role === 'p1');
-        let p2 = Object.values(this.players).find(p => p.role === 'p2');
-        
-        this.io.to(this.roomId).emit('update_players', {
-            p1: p1 ? { name: p1.name, avatar: p1.avatar, money: p1.money } : null,
-            p2: p2 ? { name: p2.name, avatar: p2.avatar, money: p2.money } : null
+    broadcastState() {
+        this.io.to(this.roomId).emit('update_table', {
+            seats: this.seats,
+            pot: this.gameState.pot,
+            dealer: this.gameState.dealerSeat,
+            activeSeat: this.gameState.activeSeat,
+            hostId: this.hostId,      
+            isRoundActive: this.gameState.isRoundActive
         });
     }
 
     startRound() {
-        if(Object.keys(this.players).length < 2) return;
-        
-        let p1 = Object.values(this.players).find(p => p.role === 'p1');
-        let p2 = Object.values(this.players).find(p => p.role === 'p2');
-        let antePaid = false;
+        // Only start if at least 2 people have money
+        const playersWithMoney = this.seats.filter(s => s !== null && s.money > 0);
+        if(playersWithMoney.length < 2) return;
 
-        if(this.gameState.pot === 0) {
-            p1.money -= this.gameState.ante;
-            p2.money -= this.gameState.ante;
-            this.gameState.pot += (this.gameState.ante * 2);
-            antePaid = true;
+        this.gameState.isRoundActive = true; 
+
+        // 1. Ante Up (Prevent Negative)
+        let anteTotal = 0;
+        this.seats.forEach(p => {
+            if(p && p.money > 0) { 
+                const contribution = Math.min(p.money, this.gameState.ante);
+                p.money -= contribution;
+                anteTotal += contribution;
+            }
+        });
+        
+        this.gameState.pot += anteTotal;
+
+        // 2. SET TURN ORDER: Host Goes First
+        const hostSeatIndex = this.seats.findIndex(s => s && s.id === this.hostId);
+        
+        if(hostSeatIndex !== -1) {
+            this.gameState.activeSeat = hostSeatIndex;
+            this.gameState.dealerSeat = hostSeatIndex; 
+        } else {
+            this.gameState.activeSeat = this.seats.findIndex(s => s !== null && s.money > 0);
         }
 
-        this.gameState.activePlayer = this.gameState.firstPlayer;
-        this.broadcastPlayerUpdate();
-        this.dealHand(antePaid);
+        this.broadcastState();
+        
+        // 3. Deal Hand with 'isNewRound' flag set to TRUE
+        this.dealHand(true); 
     }
 
-    dealHand(antePaid) {
+    // UPDATED: Skip Empty Seats AND Bankrupt Players
+    getNextSeat(currentIndex) {
+        let next = (currentIndex + 1) % 6;
+        let count = 0;
+        while((this.seats[next] === null || this.seats[next].money <= 0) && count < 6) {
+            next = (next + 1) % 6;
+            count++;
+        }
+        return next;
+    }
+
+    dealHand(isNewRound = false) {
         this.gameState.card1 = this.gameState.deck.draw();
         this.gameState.card2 = this.gameState.deck.draw();
         
-        let p1 = Object.values(this.players).find(p => p.role === 'p1');
-        let p2 = Object.values(this.players).find(p => p.role === 'p2');
-
         this.io.to(this.roomId).emit('new_hand_dealt', {
-            antePaid: antePaid,
-            p1Money: p1.money,
-            p2Money: p2.money,
             pot: this.gameState.pot,
             card1: this.gameState.card1,
             card2: this.gameState.card2,
-            activePlayer: this.gameState.activePlayer
+            activeSeat: this.gameState.activeSeat,
+            seats: this.seats,
+            isNewRound: isNewRound 
         });
-
         this.startTurnTimer();
     }
 
     startTurnTimer() {
         clearTimeout(this.turnTimer); 
-        this.io.to(this.roomId).emit('timer_start', this.gameState.turnDuration);
+        this.io.to(this.roomId).emit('timer_start', { 
+            duration: this.gameState.turnDuration, 
+            seat: this.gameState.activeSeat 
+        });
 
         this.turnTimer = setTimeout(() => {
-            let activeSocketId = Object.keys(this.players).find(key => this.players[key].role === this.gameState.activePlayer);
-            if(activeSocketId) {
-                // We fake a socket call to reuse logic
-                this.handleAction(activeSocketId, 'pass', 0);
-            }
+            const currentP = this.seats[this.gameState.activeSeat];
+            if(currentP) this.handleAction(currentP.id, 'pass', 0);
         }, this.gameState.turnDuration * 1000);
     }
 
     handleAction(socketId, actionType, betAmount) {
-        const player = this.players[socketId];
-        if(!player || player.role !== this.gameState.activePlayer) return;
+        const playerIndex = this.seats.findIndex(s => s && s.id === socketId);
+        if(playerIndex === -1 || playerIndex !== this.gameState.activeSeat) return;
 
+        const player = this.seats[playerIndex];
         clearTimeout(this.turnTimer);
 
         let resultType = 'pass';
@@ -164,11 +220,12 @@ class GameRoom {
         let resultCard = null;
 
         if(actionType === 'pass') {
-            player.money -= this.gameState.penalty;
-            this.gameState.pot += this.gameState.penalty;
-            resultType = 'pass';
+            const deduction = Math.min(player.money, this.gameState.penalty);
+            player.money -= deduction;
+            this.gameState.pot += deduction;
+            amount = deduction; // Correctly report penalty amount
         } else {
-            amount = parseInt(betAmount);
+            amount = Math.min(parseInt(betAmount), player.money);
             player.money -= amount;
             
             resultCard = this.gameState.deck.draw();
@@ -187,88 +244,110 @@ class GameRoom {
             }
         }
 
-        let p1 = Object.values(this.players).find(p => p.role === 'p1');
-        let p2 = Object.values(this.players).find(p => p.role === 'p2');
-        
+        // 1. Broadcast Result
         this.io.to(this.roomId).emit('turn_resolved', {
-            who: player.role,
+            seatIndex: playerIndex,
             result: resultType,
             amount: amount,
             cardResult: resultCard,
-            p1Money: p1.money, 
-            p2Money: p2.money,
+            seats: this.seats,
             pot: this.gameState.pot
         });
 
-        this.broadcastPlayerUpdate();
-
-        // Bankruptcy
-        if(p1.money < this.gameState.ante || p2.money < this.gameState.ante) {
-            let winner = (p1.money > p2.money) ? 'p1' : 'p2';
-            this.io.to(this.roomId).emit('game_ended', { winner: winner });
-            this.gameState.pot = 0; 
-            return; 
+        // 2. CHECK SURVIVOR CONDITION
+        const survivors = this.seats.filter(s => s !== null && s.money > 0);
+        
+        if(this.gameState.pot <= 0) {
+             this.endRound(playerIndex, "Pot Empty");
+             return;
         }
 
-        // Proceed
+        if(survivors.length === 1) {
+            survivors[0].money += this.gameState.pot;
+            this.gameState.pot = 0;
+            this.endRound(survivors[0].seatIndex, "Last Man Standing");
+            return;
+        }
+        
+        if(survivors.length === 0) {
+            this.endRound(-1, "House Wins");
+            return;
+        }
+
+        // 3. KICK BANKRUPT PLAYERS
+        if (player.money <= 0) {
+            this.io.to(player.id).emit('you_are_bankrupt');
+            this.seats[playerIndex] = null; 
+            this.broadcastState(); 
+        }
+
+        // 4. Move to next player
+        const nextSeat = this.getNextSeat(this.gameState.activeSeat);
+        
         setTimeout(() => {
-            if(this.gameState.pot === 0) {
-                this.endRound();
-                return;
-            }
-            if(this.gameState.activePlayer === this.gameState.firstPlayer) {
-                this.gameState.activePlayer = (this.gameState.firstPlayer === 'p1') ? 'p2' : 'p1';
-                this.dealHand(false);
-            } else {
-                this.endRound();
-            }
+            this.gameState.activeSeat = nextSeat;
+            this.dealHand(false); // Just next turn
         }, 3000);
     }
+    
+    endRound(winnerIndex, reason) {
+        this.io.to(this.roomId).emit('game_ended', { 
+            winnerSeat: winnerIndex,
+            reason: reason 
+        });
 
-    endRound() {
-        this.gameState.firstPlayer = (this.gameState.firstPlayer === 'p1') ? 'p2' : 'p1';
-        this.io.to(this.roomId).emit('round_over', { nextStart: this.gameState.firstPlayer });
+        // KICK BANKRUPT PLAYERS
+        for(let i=0; i<this.seats.length; i++) {
+            if(this.seats[i] && this.seats[i].money <= 0) {
+                this.io.to(this.seats[i].id).emit('you_are_bankrupt');
+                this.seats[i] = null; 
+            }
+        }
+
+        // RESET TABLE STATE
+        this.gameState.pot = 0; 
+        this.gameState.activeSeat = -1;
+        this.gameState.isRoundActive = false; 
+        this.gameState.card1 = null;
+        this.gameState.card2 = null;
+
+        this.broadcastState(); 
+    }
+
+    handleChat(socketId, msg) {
+        const player = this.seats.find(s => s && s.id === socketId);
+        if(player) {
+            this.io.to(this.roomId).emit('chat_received', {
+                seatIndex: player.seatIndex,
+                msg: msg.substring(0, 20)
+            });
+        }
     }
 
     resetGame() {
-        Object.values(this.players).forEach(p => p.money = 1000);
+        this.seats.forEach(p => { if(p) p.money = 1000; });
         this.gameState.pot = 0;
-        this.gameState.firstPlayer = 'p1';
+        this.gameState.activeSeat = -1;
+        this.gameState.isRoundActive = false; 
+        this.broadcastState();
         this.io.to(this.roomId).emit('game_reset');
-        this.broadcastPlayerUpdate();
-        this.io.to(this.roomId).emit('round_over', { nextStart: 'p1' });
-    }
-
-    handleChat(socketId, message) {
-        const player = this.players[socketId];
-        if(!player) return;
-
-        // Broadcast to room: "P1 says: Hello"
-        this.io.to(this.roomId).emit('chat_received', {
-            role: player.role, // 'p1' or 'p2'
-            msg: message.substring(0, 20) // Limit length to prevent spam
-        });
     }
 }
 
 // --- GLOBAL STATE ---
-const rooms = {}; // Map: roomId -> GameRoom
+const rooms = {}; 
 
 io.on('connection', (socket) => {
-    // 1. CREATE ROOM
     socket.on('create_room', (userData) => {
         const roomId = Math.random().toString(36).substring(2, 7).toUpperCase();
-        
-        // PASS CONFIG HERE
-        rooms[roomId] = new GameRoom(roomId, io, userData.config);
-        
+        rooms[roomId] = new GameRoom(roomId, io, userData.config, socket.id);
         rooms[roomId].addPlayer(socket, userData);
-        console.log(`Room ${roomId} created with Ante: ${userData.config.ante}, Penalty: ${userData.config.penalty}`);
+        console.log(`Room ${roomId} created by Host ${socket.id}`);
+        // 1. BROADCAST USER COUNT (On Connect)
+        io.emit('update_user_count', io.engine.clientsCount);
     });
 
-    // 2. JOIN ROOM
     socket.on('join_room', (data) => {
-        // data = { roomId, name, avatar }
         const room = rooms[data.roomId];
         if(room) {
             const success = room.addPlayer(socket, data);
@@ -278,23 +357,24 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 3. DISCONNECT
     socket.on('disconnect', () => {
         const roomId = socket.data.roomId;
         if(roomId && rooms[roomId]) {
             rooms[roomId].removePlayer(socket.id);
-            // Optional: Cleanup empty rooms
-            if(Object.keys(rooms[roomId].players).length === 0) {
+            if(rooms[roomId] && rooms[roomId].seats.every(s => s === null)) {
                 delete rooms[roomId];
-                console.log(`Room ${roomId} deleted.`);
             }
         }
+        // We broadcast immediately. (Note: io.engine.clientsCount updates automatically)
+        io.emit('update_user_count', io.engine.clientsCount);
     });
 
-    // 4. GAME ACTIONS (Proxy to specific Room)
     socket.on('req_start_round', () => {
         const r = rooms[socket.data.roomId];
-        if(r) r.startRound();
+        if(r) {
+            if (socket.id !== r.hostId) return; 
+            r.startRound();
+        }
     });
 
     socket.on('req_action', (data) => {
@@ -307,13 +387,9 @@ io.on('connection', (socket) => {
         if(r) r.resetGame();
     });
 
-    // 5. CHAT REQUEST
     socket.on('req_chat', (msg) => {
         const r = rooms[socket.data.roomId];
-        if(r) {
-            console.log(`Chat in room ${socket.data.roomId}: ${msg}`); // Added Log
-            r.handleChat(socket.id, msg);
-        }
+        if(r) r.handleChat(socket.id, msg);
     });
 });
 

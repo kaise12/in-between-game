@@ -19,6 +19,12 @@
     </div>
 
     <div id="landing-page">
+
+        <div class="online-indicator">
+            <div class="online-dot"></div>
+            <span id="online-count">0</span> Online
+        </div>
+        
         <div class="bg-suit" style="left: 10%; animation-duration: 8s;">♠</div>
         <div class="bg-suit" style="left: 80%; animation-duration: 12s; animation-delay: 2s;">♥</div>
         <div class="bg-suit" style="left: 20%; animation-duration: 15s; animation-delay: 5s;">♣</div>
@@ -26,7 +32,10 @@
 
         <div class="title-container">
             <h1 class="title-line-1">In-Between</h1>
-            <div class="title-line-2">Multiplayer PvP</div>
+            
+            <div class="title-line-2">
+                <span class="pinoy-badge">PINOY VERSION 🇵🇭</span>
+            </div>
         </div>
         
         <div class="identity-box">
@@ -49,6 +58,9 @@
         </div>
 
         <button class="btn-settings" style="margin-top:20px;" onclick="toggleSettings(true)">⚙ Settings</button>
+        <div class="footer-credit">
+            Fun project by <a href="#" onclick="return false;">Raymart Panila</a>
+        </div>
     </div>
 
     <div id="settings-modal">
@@ -100,41 +112,82 @@
         </div>
     </div>
 
-    <div id="game-wrapper">
-        <div class="room-display">Room: <span id="disp-room-id">---</span></div>
+    <div id="bankrupt-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 10002; flex-direction: column; justify-content: center; align-items: center;">
+    <h1 style="color: #e74c3c; font-size: 3rem; margin-bottom: 10px; text-transform: uppercase;">BUSTED!</h1>
+    <p style="color: white; font-size: 1.2rem; margin-bottom: 30px;">You ran out of money.</p>
+    
+    <div style="display: flex; gap: 20px;">
+        <button onclick="spectateGame()" style="background: #3498db; color: white; padding: 15px 30px; border: none; border-radius: 50px; font-weight: bold; cursor: pointer;">
+            👀 Spectate
+        </button>
+        <button onclick="location.reload()" style="background: #95a5a6; color: white; padding: 15px 30px; border: none; border-radius: 50px; font-weight: bold; cursor: pointer;">
+            🚪 Exit to Lobby
+        </button>
+    </div>
+</div>
 
-        <div class="scoreboard">
-            <div class="score-box" id="p1-score-box">
-                <div class="chat-bubble" id="p1-bubble">Hello!</div> <small id="p1-name">Waiting...</small> <span id="p1-bank">1000</span>
+    <div id="game-wrapper">
+
+        <button class="btn-leave" onclick="confirmLeave()">🚪 Leave</button>
+        <div class="room-display">Room: <span id="disp-room-id">---</span></div>
+        <div id="notification-area"></div>
+
+        <div class="poker-table">
+            
+            <div class="seat seat-3 empty" id="seat-3">
+                <div class="seat-avatar">?</div>
+                <div class="seat-info"><span class="seat-name">Empty</span><span class="seat-money">---</span></div>
+                <div class="chat-bubble" id="bubble-3"></div>
             </div>
-            <div class="score-box" id="p2-score-box">
-                <div class="chat-bubble" id="p2-bubble">Hi!</div> <small id="p2-name">Waiting...</small> <span id="p2-bank">1000</span>
+
+            <div class="seat seat-2 empty" id="seat-2">
+                <div class="seat-avatar">?</div>
+                <div class="seat-info"><span class="seat-name">Empty</span><span class="seat-money">---</span></div>
+                <div class="chat-bubble" id="bubble-2"></div>
+            </div>
+
+            <div class="seat seat-4 empty" id="seat-4">
+                <div class="seat-avatar">?</div>
+                <div class="seat-info"><span class="seat-name">Empty</span><span class="seat-money">---</span></div>
+                <div class="chat-bubble" id="bubble-4"></div>
+            </div>
+
+            <div class="seat seat-1 empty" id="seat-1">
+                <div class="seat-avatar">?</div>
+                <div class="seat-info"><span class="seat-name">Empty</span><span class="seat-money">---</span></div>
+                <div class="chat-bubble" id="bubble-1"></div>
+            </div>
+
+            <div class="seat seat-5 empty" id="seat-5">
+                <div class="seat-avatar">?</div>
+                <div class="seat-info"><span class="seat-name">Empty</span><span class="seat-money">---</span></div>
+                <div class="chat-bubble" id="bubble-5"></div>
+            </div>
+
+            <div class="seat seat-0 active" id="seat-0">
+                <div class="seat-avatar">😎</div>
+                <div class="seat-info"><span class="seat-name" id="p1-name">You</span><span class="seat-money" id="p1-bank">1000</span></div>
+                <div class="chat-bubble" id="bubble-0"></div>
+            </div>
+
+            <div class="center-area">
+                <div class="deck-stack" id="deck-anchor"></div>
+                
+                <div class="pot-container" id="pot-display-area">
+                    <div class="pot-label">POT</div>
+                    <div class="pot-amount" id="pot-val">0</div>
+                </div>
+
+                <div class="community-cards">
+                    <div class="table-card-slot" id="slot-1"></div>
+                    <div class="table-card-slot" id="slot-result"></div>
+                    <div class="table-card-slot" id="slot-2"></div>
+                </div>
             </div>
         </div>
 
-        <div class="game-area">
-            <div id="turn-indicator" class="turn-overlay">CPU Turn</div>
-            
-            <div class="pot-container" id="pot-display-area">
-                <div class="pot-label">THE POT</div>
-                <div class="pot-amount" id="pot-val">0</div>
-            </div>
-
-            <div class="deck-container" id="deck-anchor">
-                <div class="deck-card"></div>
-                <div class="deck-card"></div>
-                <div class="deck-card"></div>
-            </div>
-            
-            <div class="hand-area">
-                <div class="card-slot" id="slot-1"></div>
-                <div class="card-slot" id="slot-result"></div>
-                <div class="card-slot" id="slot-2"></div>
-            </div>
-            <div class="info-panel">
-                <div class="main-msg" id="msg-main">Welcome</div>
-                <div class="sub-msg" id="msg-sub">Press Start to begin</div>
-            </div>
+        <div class="info-panel" style="position:absolute; top: 60%; width:100%; pointer-events:none;">
+            <div class="main-msg" id="msg-main">Waiting for players...</div>
         </div>
 
         <div class="controls">
@@ -142,14 +195,19 @@
                 <button class="btn-deal" id="btn-deal" onclick="game.startRound()">Start Round</button>
             </div>
             <div id="panel-bet" class="bet-ui">
-                <div class="slider-row">
-                    <span>Bet: <strong id="bet-val">5</strong></span>
-                    <input type="range" id="bet-slider" min="5" max="100" step="5" value="5">
-                    <button class="btn-all-in" onclick="game.setAllIn()">ALL IN!</button>
+                <div class="bet-info-row">
+                    <span class="bet-label">AMOUNT:</span>
+                    <span class="bet-number" id="bet-val">5</span>
                 </div>
+
+                <div class="slider-row">
+                    <input type="range" id="bet-slider" min="5" max="100" step="5" value="5">
+                    <button class="btn-all-in" onclick="game.setAllIn()">ALL IN</button>
+                </div>
+
                 <div class="btn-row">
                     <button class="btn-pass" id="btn-pass-action" onclick="game.playerAction(false)">PASS (-10)</button>
-                    <button class="btn-bet" onclick="game.playerAction(true)">BET</button>
+                    <button class="btn-bet" onclick="game.playerAction(true)">PLACE BET</button>
                 </div>
             </div>
         </div>
