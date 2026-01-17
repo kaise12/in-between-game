@@ -1081,3 +1081,36 @@ button:active { transform: translateY(4px); box-shadow: none; }
 
 .btn-send-chat:hover { transform: scale(1.05); }
 .btn-send-chat:active { transform: scale(0.95); }
+
+/* DEALER BUTTON MARKER */
+.dealer-marker {
+    display: none; /* Hidden by default */
+    position: absolute;
+    top: -5px;  /* Sits slightly above the avatar */
+    right: 5px; /* Sits on the right edge */
+    
+    width: 24px;
+    height: 24px;
+    
+    background: #f5f6fa;
+    color: #2c3e50;
+    border: 2px solid #bdc3c7;
+    border-radius: 50%;
+    
+    font-size: 0.8rem;
+    font-weight: 900;
+    font-family: 'Segoe UI', sans-serif;
+    
+    align-items: center;
+    justify-content: center;
+    
+    box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+    z-index: 10; /* Above avatar */
+    
+    animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Optional: Add a subtle glow to make it stand out against the felt */
+.seat.active .dealer-marker {
+    border-color: var(--gold);
+}

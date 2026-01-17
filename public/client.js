@@ -306,7 +306,7 @@ class Game {
         socket.on('update_table', (data) => {
             this.uiPot.innerText = data.pot;
             if (socket.id && data.hostId && socket.id === data.hostId && !data.isRoundActive) {
-                this.panelDeal.style.display = 'block';
+                this.panelDeal.style.display = 'block'; // Shows button for NEW host
             } else {
                 this.panelDeal.style.display = 'none';
             }
@@ -331,7 +331,23 @@ class Game {
                     seatEl.querySelector('.seat-money').textContent = '---';
                 }
             }
-            this.updateActiveSeat(data.activeSeat);
+
+            // --- NEW: UPDATE DEALER MARKER ---
+                // 1. Hide all "D" buttons first
+                document.querySelectorAll('.dealer-marker').forEach(el => el.style.display = 'none');
+
+                // 2. Show "D" for the current dealer
+                if (data.dealer !== undefined && data.dealer !== -1) {
+                    const dealerVisualPos = this.getVisualSeat(data.dealer);
+                    const dealerBtn = document.querySelector(`#seat-${dealerVisualPos} .dealer-marker`);
+                    
+                    // Only show if the seat is not empty
+                    if(dealerBtn && data.seats[data.dealer]) {
+                        dealerBtn.style.display = 'flex';
+                    }
+                }
+
+                this.updateActiveSeat(data.activeSeat);
         });
 
         socket.on('new_hand_dealt', async (data) => {
@@ -431,16 +447,39 @@ class Game {
     checkTurn(activeSeatIndex, myMoney, pot) {
         if(activeSeatIndex === this.mySeatIndex) {
             this.isMyTurn = true;
-            this.uiMsg.textContent = "Your Turn"; this.uiMsg.style.color = "var(--gold)";
+            this.uiMsg.textContent = "Your Turn"; 
+            this.uiMsg.style.color = "var(--gold)";
+            
+            // 1. RESET BUTTON STATE (Re-enable)
+            const btnPass = document.getElementById('btn-pass-action');
+            const btnBet = document.querySelector('.btn-bet');
+            
+            if(btnPass) {
+                btnPass.disabled = false;
+                btnPass.style.opacity = "1";
+                btnPass.style.cursor = "pointer";
+            }
+            if(btnBet) {
+                btnBet.disabled = false;
+                btnBet.style.opacity = "1";
+                btnBet.style.cursor = "pointer";
+                btnBet.textContent = "PLACE BET"; // Reset text
+            }
+
             this.panelBet.style.display = 'block';
+            
             const maxBet = Math.min(myMoney, pot);
-            this.slider.max = maxBet; this.slider.value = 5; this.betDisplay.textContent = 5;
+            this.slider.max = maxBet; 
+            this.slider.value = 5; 
+            this.betDisplay.textContent = 5;
         } else {
+            // ... (rest of your existing else block) ...
             this.isMyTurn = false;
             const activeVPos = this.getVisualSeat(activeSeatIndex);
             const nameEl = document.querySelector(`#seat-${activeVPos} .seat-name`);
             const name = nameEl ? nameEl.textContent : "Opponent";
-            this.uiMsg.textContent = `${name}'s Turn`; this.uiMsg.style.color = "white";
+            this.uiMsg.textContent = `${name}'s Turn`; 
+            this.uiMsg.style.color = "white";
             this.panelBet.style.display = 'none';
         }
     }
@@ -449,8 +488,33 @@ class Game {
 
     playerAction(isBetting) {
         if(!this.isMyTurn) return;
-        if(!isBetting) socket.emit('req_action', { action: 'pass' });
-        else socket.emit('req_action', { action: 'bet', amount: this.slider.value });
+
+        // 1. SELECT BUTTONS
+        const btnPass = document.getElementById('btn-pass-action');
+        const btnBet = document.querySelector('.btn-bet'); // Needs querySelector as it has no ID
+
+        // 2. DISABLE THEM IMMEDIATELY (Visual Feedback & Protection)
+        if(btnPass) {
+            btnPass.disabled = true;
+            btnPass.style.opacity = "0.5";
+            btnPass.style.cursor = "not-allowed";
+        }
+        if(btnBet) {
+            btnBet.disabled = true;
+            btnBet.style.opacity = "0.5";
+            btnBet.style.cursor = "not-allowed";
+            btnBet.textContent = "Processing..."; // UX: Let them know it worked
+        }
+
+        // 3. SEND TO SERVER
+        if(!isBetting) {
+            socket.emit('req_action', { action: 'pass' });
+        } else {
+            socket.emit('req_action', { action: 'bet', amount: this.slider.value });
+        }
+        
+        // Note: We don't need to re-enable them here. 
+        // The server will send 'turn_resolved', which hides the entire panel anyway.
     }
 
     setAllIn() {

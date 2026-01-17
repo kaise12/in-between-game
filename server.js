@@ -54,7 +54,7 @@ class GameRoom {
             card1: null,
             card2: null,
             activeSeat: -1, 
-            dealerSeat: 0, 
+            dealerSeat: -1, 
             turnDuration: 15,
             isRoundActive: false 
         };
@@ -94,6 +94,7 @@ class GameRoom {
         if(index !== -1) {
             const name = this.seats[index].name; 
             
+            // 1. Remove the player
             this.seats[index] = null;
 
             // Notify table
@@ -102,7 +103,25 @@ class GameRoom {
                 type: 'error'
             });
 
-            // --- Prevent freeze if Active Player leaves ---
+            // --- FIX PART 1: HOST MIGRATION ---
+            // If the person leaving was the Host, assign a new Host
+            if (socketId === this.hostId) {
+                // Find the first available player to be the new host
+                const newHost = this.seats.find(s => s !== null);
+                if (newHost) {
+                    this.hostId = newHost.id;
+                    this.io.to(this.roomId).emit('notification', {
+                        msg: `${newHost.name} is now the Room Host.`,
+                        type: 'success'
+                    });
+                } else {
+                    // No players left? (Room will be deleted by disconnect handler anyway)
+                    this.hostId = null;
+                }
+            }
+            // ----------------------------------
+
+            // --- FIX PART 2: ACTIVE TURN LOGIC (Existing) ---
             if (this.gameState.isRoundActive && index === this.gameState.activeSeat) {
                 clearTimeout(this.turnTimer); 
 
@@ -115,6 +134,7 @@ class GameRoom {
                     setTimeout(() => { this.dealHand(false); }, 1000);
                 }
             }
+
             this.broadcastState();
         }
     }
@@ -131,6 +151,7 @@ class GameRoom {
     }
 
     startRound() {
+        // Only start if at least 2 people have money
         const playersWithMoney = this.seats.filter(s => s !== null && s.money > 0);
         if(playersWithMoney.length < 2) return;
 
@@ -148,16 +169,31 @@ class GameRoom {
         
         this.gameState.pot += anteTotal;
 
-        // 2. SET TURN ORDER: Host Goes First
-        const hostSeatIndex = this.seats.findIndex(s => s && s.id === this.hostId);
-        if(hostSeatIndex !== -1) {
-            this.gameState.activeSeat = hostSeatIndex;
-            this.gameState.dealerSeat = hostSeatIndex; 
+        // 2. SET DEALER ROTATION
+        // If it's the first game (dealerSeat is -1), pick the Host.
+        if (this.gameState.dealerSeat === -1 || this.gameState.dealerSeat === undefined) {
+            const hostSeatIndex = this.seats.findIndex(s => s && s.id === this.hostId);
+            // If Host is playing, they start. If not, pick first available player.
+            this.gameState.dealerSeat = (hostSeatIndex !== -1) ? hostSeatIndex : this.seats.findIndex(s => s !== null && s.money > 0);
         } else {
-            this.gameState.activeSeat = this.seats.findIndex(s => s !== null && s.money > 0);
+            // ROTATE: Find next player from the LAST dealer
+            this.gameState.dealerSeat = this.getNextSeat(this.gameState.dealerSeat);
         }
 
+        // --- SAFETY CHECK (The Fix) ---
+        // Ensure the selected Dealer seat is not null (in case of race conditions or rapid disconnects)
+        if (this.seats[this.gameState.dealerSeat] === null) {
+            // If the selected seat is empty, force rotate to the next valid one immediately
+            this.gameState.dealerSeat = this.getNextSeat(this.gameState.dealerSeat);
+        }
+        // ------------------------------
+
+        // Set the active turn to the Dealer
+        this.gameState.activeSeat = this.gameState.dealerSeat;
+
         this.broadcastState();
+        
+        // 3. Deal Hand
         this.dealHand(true); 
     }
 
