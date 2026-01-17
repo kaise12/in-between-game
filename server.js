@@ -78,7 +78,7 @@ class GameRoom {
         socket.data.roomId = this.roomId;
         socket.data.seatIndex = seatIndex; 
 
-        // NEW: Notify everyone ELSE that someone joined
+        // Notify everyone ELSE that someone joined
         socket.broadcast.to(this.roomId).emit('notification', {
             msg: `${userData.name} joined the table!`,
             type: 'success'
@@ -102,23 +102,19 @@ class GameRoom {
                 type: 'error'
             });
 
-            // --- CRITICAL FIX: Prevent freeze if Active Player leaves ---
+            // --- Prevent freeze if Active Player leaves ---
             if (this.gameState.isRoundActive && index === this.gameState.activeSeat) {
-                clearTimeout(this.turnTimer); // Stop the timer
+                clearTimeout(this.turnTimer); 
 
-                // Check for last man standing immediately
                 const survivors = this.seats.filter(s => s !== null && s.money > 0);
                 if (survivors.length < 2) {
-                     this.endRound(-1, "Opponent Left"); // Game over
+                     this.endRound(-1, "Opponent Left"); 
                 } else {
-                    // Move to next player
                     const nextSeat = this.getNextSeat(this.gameState.activeSeat);
                     this.gameState.activeSeat = nextSeat;
                     setTimeout(() => { this.dealHand(false); }, 1000);
                 }
             }
-            // ------------------------------------------------------------
-
             this.broadcastState();
         }
     }
@@ -135,13 +131,12 @@ class GameRoom {
     }
 
     startRound() {
-        // Only start if at least 2 people have money
         const playersWithMoney = this.seats.filter(s => s !== null && s.money > 0);
         if(playersWithMoney.length < 2) return;
 
         this.gameState.isRoundActive = true; 
 
-        // 1. Ante Up (Prevent Negative)
+        // 1. Ante Up 
         let anteTotal = 0;
         this.seats.forEach(p => {
             if(p && p.money > 0) { 
@@ -155,7 +150,6 @@ class GameRoom {
 
         // 2. SET TURN ORDER: Host Goes First
         const hostSeatIndex = this.seats.findIndex(s => s && s.id === this.hostId);
-        
         if(hostSeatIndex !== -1) {
             this.gameState.activeSeat = hostSeatIndex;
             this.gameState.dealerSeat = hostSeatIndex; 
@@ -164,12 +158,9 @@ class GameRoom {
         }
 
         this.broadcastState();
-        
-        // 3. Deal Hand with 'isNewRound' flag set to TRUE
         this.dealHand(true); 
     }
 
-    // UPDATED: Skip Empty Seats AND Bankrupt Players
     getNextSeat(currentIndex) {
         let next = (currentIndex + 1) % 6;
         let count = 0;
@@ -223,11 +214,10 @@ class GameRoom {
             const deduction = Math.min(player.money, this.gameState.penalty);
             player.money -= deduction;
             this.gameState.pot += deduction;
-            amount = deduction; // Correctly report penalty amount
+            amount = deduction; 
         } else {
             amount = Math.min(parseInt(betAmount), player.money);
             player.money -= amount;
-            
             resultCard = this.gameState.deck.draw();
             let low = Math.min(this.gameState.card1.value, this.gameState.card2.value);
             let high = Math.max(this.gameState.card1.value, this.gameState.card2.value);
@@ -244,7 +234,6 @@ class GameRoom {
             }
         }
 
-        // 1. Broadcast Result
         this.io.to(this.roomId).emit('turn_resolved', {
             seatIndex: playerIndex,
             result: resultType,
@@ -254,7 +243,6 @@ class GameRoom {
             pot: this.gameState.pot
         });
 
-        // 2. CHECK SURVIVOR CONDITION
         const survivors = this.seats.filter(s => s !== null && s.money > 0);
         
         if(this.gameState.pot <= 0) {
@@ -274,19 +262,16 @@ class GameRoom {
             return;
         }
 
-        // 3. KICK BANKRUPT PLAYERS
         if (player.money <= 0) {
             this.io.to(player.id).emit('you_are_bankrupt');
             this.seats[playerIndex] = null; 
             this.broadcastState(); 
         }
 
-        // 4. Move to next player
         const nextSeat = this.getNextSeat(this.gameState.activeSeat);
-        
         setTimeout(() => {
             this.gameState.activeSeat = nextSeat;
-            this.dealHand(false); // Just next turn
+            this.dealHand(false); 
         }, 3000);
     }
     
@@ -295,22 +280,17 @@ class GameRoom {
             winnerSeat: winnerIndex,
             reason: reason 
         });
-
-        // KICK BANKRUPT PLAYERS
         for(let i=0; i<this.seats.length; i++) {
             if(this.seats[i] && this.seats[i].money <= 0) {
                 this.io.to(this.seats[i].id).emit('you_are_bankrupt');
                 this.seats[i] = null; 
             }
         }
-
-        // RESET TABLE STATE
         this.gameState.pot = 0; 
         this.gameState.activeSeat = -1;
         this.gameState.isRoundActive = false; 
         this.gameState.card1 = null;
         this.gameState.card2 = null;
-
         this.broadcastState(); 
     }
 
@@ -338,16 +318,29 @@ class GameRoom {
 const rooms = {}; 
 
 io.on('connection', (socket) => {
+    
+    // 1. Join Lobby & Broadcast Count
+    socket.join('lobby');
+    io.emit('update_user_count', io.engine.clientsCount);
+
+    // 2. Lobby Chat
+    socket.on('req_lobby_chat', (data) => {
+        io.to('lobby').emit('lobby_chat_received', {
+            name: data.name,
+            msg: data.msg
+        });
+    });
+
     socket.on('create_room', (userData) => {
+        socket.leave('lobby'); // Leave global lobby
         const roomId = Math.random().toString(36).substring(2, 7).toUpperCase();
         rooms[roomId] = new GameRoom(roomId, io, userData.config, socket.id);
         rooms[roomId].addPlayer(socket, userData);
         console.log(`Room ${roomId} created by Host ${socket.id}`);
-        // 1. BROADCAST USER COUNT (On Connect)
-        io.emit('update_user_count', io.engine.clientsCount);
     });
 
     socket.on('join_room', (data) => {
+        socket.leave('lobby'); // Leave global lobby
         const room = rooms[data.roomId];
         if(room) {
             const success = room.addPlayer(socket, data);
@@ -365,7 +358,6 @@ io.on('connection', (socket) => {
                 delete rooms[roomId];
             }
         }
-        // We broadcast immediately. (Note: io.engine.clientsCount updates automatically)
         io.emit('update_user_count', io.engine.clientsCount);
     });
 

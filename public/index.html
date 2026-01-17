@@ -229,6 +229,33 @@
         </div>
     </div>
 
+    <div id="lobby-chat-fab" onclick="toggleLobbyChat()">
+        💬 <span id="lobby-badge" class="badge">0</span>
+    </div>
+
+    <div id="lobby-chat-window">
+        <div class="lobby-header">
+            <div class="lobby-title">
+                <span>💬 Global Lobby</span>
+                <span class="online-status">● Live</span>
+            </div>
+            <button class="btn-close-chat" onclick="toggleLobbyChat()">&times;</button>
+        </div>
+        
+        <div id="lobby-messages">
+            <div class="lobby-msg system">Welcome to global chat!</div>
+        </div>
+        
+        <div class="lobby-input-area">
+            <input type="text" id="lobby-input" placeholder="Type a message..." onkeypress="handleLobbyEnter(event)">
+            <button class="btn-send-chat" onclick="sendLobbyMessage()">
+                <svg viewBox="0 0 24 24" fill="white" width="16px" height="16px">
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+                </svg>
+            </button>
+        </div>
+    </div>
+
     <script src="client.js"></script>
 </body>
 </html>

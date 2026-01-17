@@ -48,6 +48,52 @@ const sfx = new SoundManager();
 // --- SOCKET CONNECTION ---
 const socket = io();
 
+// --- GLOBAL LOBBY CHAT LOGIC ---
+let isLobbyOpen = false;
+let unreadLobbyMsg = 0;
+
+function toggleLobbyChat() {
+    const win = document.getElementById('lobby-chat-window');
+    const badge = document.getElementById('lobby-badge');
+    
+    isLobbyOpen = !isLobbyOpen;
+    
+    if(isLobbyOpen) {
+        win.classList.add('open');
+        unreadLobbyMsg = 0; // Reset Badge
+        badge.textContent = 0;
+        badge.classList.remove('show');
+        setTimeout(() => {
+            const input = document.getElementById('lobby-input');
+            if(input) input.focus();
+        }, 300);
+    } else {
+        win.classList.remove('open');
+    }
+}
+
+function handleLobbyEnter(e) {
+    if(e.key === 'Enter') sendLobbyMessage();
+}
+
+function sendLobbyMessage() {
+    const input = document.getElementById('lobby-input');
+    const msg = input.value.trim();
+    if(!msg) return;
+
+    // Get Name: If nickname input is empty, make up a Guest Name
+    let name = document.getElementById('input-nickname').value.trim();
+    if(!name) {
+        if(!sessionStorage.getItem('guestName')) {
+            sessionStorage.setItem('guestName', 'Guest ' + Math.floor(Math.random()*1000));
+        }
+        name = sessionStorage.getItem('guestName');
+    }
+
+    socket.emit('req_lobby_chat', { name: name, msg: msg });
+    input.value = '';
+}
+
 // --- UI HELPERS ---
 function toggleSettings(show) { document.getElementById('settings-modal').style.display = show ? 'flex' : 'none'; }
 function updateSettingsUI() { sfx.enabled = document.getElementById('input-sound').checked; }
@@ -93,68 +139,46 @@ function joinRoom() {
     sfx.init();
     socket.emit('join_room', { roomId: code, name: name, avatar: selectedAvatar });
 }
-
 function fireConfetti() {
     const colors = ['#f1c40f', '#e74c3c', '#2ecc71', '#3498db', '#9b59b6', '#ffffff'];
     for(let i=0; i<100; i++) {
         const c = document.createElement('div'); c.classList.add('confetti');
         c.style.backgroundColor = colors[Math.floor(Math.random()*colors.length)];
         c.style.left = Math.random()*100 + '%';
-        
-        // Faster fall speed (1.5s to 2.5s)
         c.style.animationDuration = (Math.random()*1 + 1.5)+'s'; 
-        
-        // Less delay (0s to 0.5s) so they start immediately
         c.style.animationDelay = Math.random()*0.5+'s';
-        
         document.body.appendChild(c);
-        
-        // Cleanup after 3 seconds exactly
         setTimeout(()=>c.remove(), 3000);
     }
 }
-
 function spectateGame() {
     document.getElementById('bankrupt-modal').style.display = 'none';
-    // Hide controls just in case
     document.getElementById('panel-deal').style.display = 'none';
     document.getElementById('panel-bet').style.display = 'none';
-
-    // Optional: Show a "Spectating" badge
     const msg = document.getElementById('msg-main');
     msg.textContent = "SPECTATING MODE";
     msg.style.color = "#3498db";
 }
-
-// --- LEAVE FUNCTION ---
 function confirmLeave() {
     if(confirm("Are you sure you want to leave the table?")) {
-        // Reloading disconnects the socket and resets the UI to the Landing Page
         location.reload();
     }
 }
-
-// --- NOTIFICATION HELPER ---
 function showNotification(msg, type = 'info') {
     const container = document.getElementById('notification-area');
     if(!container) return;
-
     const toast = document.createElement('div');
-    toast.className = `toast ${type}`; // e.g., "toast success"
+    toast.className = `toast ${type}`; 
     toast.textContent = msg;
-
     container.appendChild(toast);
-
-    // Remove from DOM after animation (4 seconds total)
-    setTimeout(() => {
-        toast.remove();
-    }, 4000);
+    setTimeout(() => { toast.remove(); }, 4000);
 }
+
 
 // --- MAIN GAME CLASS (6-PLAYER) ---
 class Game {
     constructor() {
-        this.mySeatIndex = 0; // Server index (0-5)
+        this.mySeatIndex = 0; 
         this.isMyTurn = false;
         
         // UI Refs
@@ -174,17 +198,15 @@ class Game {
         if(bar) {
             bar.classList.remove('timer-active', 'urgent');
             bar.style.width = '0%';
-            bar.style.animationDuration = '0s'; // Reset immediate
+            bar.style.animationDuration = '0s'; 
         }
     }
 
-    // --- KEY HELPER: ROTATE TABLE ---
     getVisualSeat(serverIndex) {
         if(serverIndex === null || serverIndex === undefined) return -1;
         return (serverIndex - this.mySeatIndex + 6) % 6;
     }
 
-    // --- HELPER: UPDATE AVATAR GLOW ---
     updateActiveSeat(activeSeatIndex) {
         document.querySelectorAll('.seat').forEach(el => el.classList.remove('active'));
         if(activeSeatIndex >= 0) {
@@ -194,110 +216,105 @@ class Game {
         }
     }
 
-    // --- NEW HELPER: FLOATING MONEY TEXT ---
     showFloatingText(serverSeatIndex, amount) {
         const visualPos = this.getVisualSeat(serverSeatIndex);
         const seatEl = document.getElementById(`seat-${visualPos}`);
         if(!seatEl) return;
-
         const floatEl = document.createElement('div');
         floatEl.className = amount >= 0 ? 'floating-text gain' : 'floating-text loss';
         floatEl.textContent = amount >= 0 ? `+${amount}` : `${amount}`;
-        
-        // Position it roughly over the avatar
         const rect = seatEl.getBoundingClientRect();
         floatEl.style.left = (rect.left + 20) + 'px';
         floatEl.style.top = (rect.top) + 'px';
-        
         document.body.appendChild(floatEl);
-        setTimeout(() => floatEl.remove(), 1500); // Clean up after animation
+        setTimeout(() => floatEl.remove(), 1500); 
     }
 
     setupSocketListeners() {
+        // --- LOBBY CHAT LISTENER ---
+        socket.on('lobby_chat_received', (data) => {
+            const chatBox = document.getElementById('lobby-messages');
+            if(!chatBox) return;
+            const div = document.createElement('div');
+            div.className = 'lobby-msg';
+            div.innerHTML = `<strong>${data.name}:</strong> ${data.msg}`;
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            // Badge Logic
+            if(!isLobbyOpen) {
+                unreadLobbyMsg++;
+                const badge = document.getElementById('lobby-badge');
+                if(badge) {
+                    badge.textContent = unreadLobbyMsg;
+                    badge.classList.add('show');
+                    sfx.chip(); // Play sound notification
+                }
+            }
+        });
+
         socket.on('welcome', (data) => {
             this.mySeatIndex = data.seatIndex; 
             if(data.roomId) document.getElementById('disp-room-id').textContent = data.roomId;
-            
             const landing = document.getElementById('landing-page');
             const gameWrap = document.getElementById('game-wrapper');
             landing.style.transform = 'translateY(-100%)';
+            // Hide Lobby Chat UI when game starts
+            document.getElementById('lobby-chat-fab').style.display = 'none';
+            document.getElementById('lobby-chat-window').style.display = 'none';
+            
             setTimeout(() => { landing.style.display = 'none'; gameWrap.style.display = 'block'; gameWrap.style.opacity = '1'; }, 500);
         });
 
         socket.on('update_user_count', (count) => {
             const el = document.getElementById('online-count');
             if(el) {
-                // Animate the number changing (Optional polish)
                 el.style.transform = "scale(1.5)";
                 el.style.color = "#fff";
                 setTimeout(() => {
                     el.style.transform = "scale(1)";
                     el.style.color = "rgba(255, 255, 255, 0.8)";
                 }, 200);
-                
                 el.textContent = count;
             }
         });
 
         socket.on('notification', (data) => {
-            // data = { msg: "Player joined", type: "success" }
             showNotification(data.msg, data.type);
-            
-            // Optional: Play a subtle sound
-            // sfx.chip(); 
         });
 
         socket.on('you_are_bankrupt', () => {
             const modal = document.getElementById('bankrupt-modal');
-            // Close the Game Over modal if it's open
             document.getElementById('game-over-modal').style.display = 'none';
-
-            // Show the Bankrupt Options
             modal.style.display = 'flex';
-
-            // You are no longer "seated", so you don't have a seatIndex
             this.mySeatIndex = -1; 
         });
 
         socket.on('error_msg', (msg) => { alert(msg); });
 
-        // --- TIMER LISTENER (Fixed) ---
         socket.on('timer_start', (data) => {
-            // data = { duration, seat }
             const bar = document.getElementById('timer-bar');
-            
-            // 1. Reset Animation (Force Reflow)
             bar.classList.remove('timer-active', 'urgent');
-            void bar.offsetWidth; // Trigger Reflow
-            
-            // 2. Set Duration
+            void bar.offsetWidth; 
             bar.style.animationDuration = `${data.duration}s`;
-            
-            // 3. Add Urgent style if it's MY turn
             if (data.seat === this.mySeatIndex) {
                 bar.classList.add('urgent');
             }
-            
-            // 4. Start Animation
             bar.classList.add('timer-active');
         });
 
         socket.on('update_table', (data) => {
             this.uiPot.innerText = data.pot;
-            
-            // Host Button Logic
             if (socket.id && data.hostId && socket.id === data.hostId && !data.isRoundActive) {
                 this.panelDeal.style.display = 'block';
             } else {
                 this.panelDeal.style.display = 'none';
             }
-
             for(let i=0; i<6; i++) {
                 const seatData = data.seats[i];
                 const visualPos = this.getVisualSeat(i); 
                 const seatEl = document.getElementById(`seat-${visualPos}`);
                 seatEl.className = `seat seat-${visualPos}`;
-                
                 if(seatData) {
                     seatEl.querySelector('.seat-avatar').textContent = seatData.avatar;
                     seatEl.querySelector('.seat-name').textContent = seatData.name;
@@ -318,7 +335,6 @@ class Game {
         });
 
         socket.on('new_hand_dealt', async (data) => {
-            // 1. Update visual money immediately
             for(let i=0; i<6; i++) {
                 const s = data.seats[i];
                 if(s) {
@@ -327,8 +343,6 @@ class Game {
                     if(moneyEl) moneyEl.textContent = s.money;
                 }
             }
-
-            // 2. ANIMATE ANTE (Only if it's actually a new round!)
             if (data.isNewRound) { 
                 data.seats.forEach((s, i) => {
                     if(s && s.money > 0) {
@@ -337,85 +351,62 @@ class Game {
                     }
                 });
             }
-
             this.uiPot.innerText = data.pot;
             this.panelDeal.style.display = 'none';
             document.querySelectorAll('.table-card-slot').forEach(el => el.innerHTML = '');
-
             sfx.deal();
             await this.animateCardFly('slot-1', data.card1);
             await this.animateCardFly('slot-2', data.card2);
             this.updateActiveSeat(data.activeSeat);
-            
             if (data.seats[this.mySeatIndex]) {
                  this.checkTurn(data.activeSeat, data.seats[this.mySeatIndex].money, data.pot);
             }
         });
 
         socket.on('turn_resolved', async (data) => {
-            this.stopTimer(); // STOP TIMER ON ACTION
-
-            // data = { seatIndex, result, amount, cardResult, pot, seats }
+            this.stopTimer(); 
             this.uiPot.innerText = data.pot;
             this.panelBet.style.display = 'none';
-
             const visualPos = this.getVisualSeat(data.seatIndex);
-            // SAFETY CHECK: If player was just kicked, data.seats[index] might be null.
             const playerData = data.seats[data.seatIndex] || { name: "Player", money: 0 };
             const name = (data.seatIndex === this.mySeatIndex) ? "You" : playerData.name;
 
             if(data.result === 'pass') {
                 this.uiMsg.textContent = `${name} Passed`;
-                // Animate Penalty Chip
                 await this.animateChip(`seat-${visualPos}`, 'pot-val');
-                this.showFloatingText(data.seatIndex, -data.amount); // Show actual penalty
+                this.showFloatingText(data.seatIndex, -data.amount); 
             } else {
                 this.uiMsg.textContent = `${name} Bets ${data.amount}`;
-                
-                // Animate Bet Chips FIRST
                 await this.animateChip(`seat-${visualPos}`, 'pot-val');
                 this.showFloatingText(data.seatIndex, -data.amount);
-
                 if(data.cardResult) await this.animateCardFly('slot-result', data.cardResult);
-                
                 if(data.result === 'win') {
                     this.uiMsg.textContent = `${name} WON!`; this.uiMsg.style.color = "var(--success)";
                     sfx.win();
-                    // Animate Pot back to Player
                     await this.animateChip('pot-val', `seat-${visualPos}`);
-                    this.showFloatingText(data.seatIndex, +(data.amount * 2)); // Show Winnings
+                    this.showFloatingText(data.seatIndex, +(data.amount * 2)); 
                 } else {
                     this.uiMsg.textContent = `${name} LOST!`; this.uiMsg.style.color = "var(--danger)";
                     sfx.lose();
                 }
             }
-            
-            // Sync final money
             const moneyEl = document.querySelector(`#seat-${visualPos} .seat-money`);
             if(moneyEl) moneyEl.textContent = playerData.money;
         });
 
         socket.on('game_ended', (data) => {
-            this.stopTimer(); // STOP TIMER
-
-            // data = { winnerSeat, reason }
+            this.stopTimer(); 
             this.panelBet.style.display = 'none';
             this.updateActiveSeat(-1); 
-
-            // 1. If I WON: Celebrate briefly
             if(data.winnerSeat === this.mySeatIndex) {
                 this.uiMsg.textContent = "VICTORY! +POT"; 
                 this.uiMsg.style.color = "var(--success)";
                 sfx.win();
                 fireConfetti(); 
-            } 
-            // 2. If I LOST
-            else {
+            } else {
                 this.uiMsg.textContent = "ROUND OVER"; 
                 this.uiMsg.style.color = "white";
             }
-
-            // 3. TRANSITION: After 3 seconds (Confetti ends), show Waiting state
             setTimeout(() => {
                 this.uiMsg.textContent = "Waiting for players...";
                 this.uiMsg.style.color = "white";
@@ -495,41 +486,24 @@ class Game {
         return new Promise(resolve => {
             let fromEl = document.getElementById(fromId);
             let toEl = document.getElementById(toId);
-            
-            // Fallback: If target is the Pot Text, use the Container for better centering
             if(toId === 'pot-val' || toId === 'pot-display-area') {
-                 // Try to find the parent container of the pot value
                  const potText = document.getElementById('pot-val');
                  if(potText) toEl = potText.parentElement; 
             }
-
-            // Visual Fallback for classes
             if(!fromEl) fromEl = document.querySelector(`.${fromId}`);
             if(!toEl) toEl = document.querySelector(`.${toId}`);
-
             if(!fromEl || !toEl) { resolve(); return; }
-            
-            sfx.chip(); // Play Sound
-            
+            sfx.chip(); 
             const fromRect = fromEl.getBoundingClientRect();
             const toRect = toEl.getBoundingClientRect();
-            
             const chip = document.createElement('div');
             chip.className = 'flying-chip';
-            
-            // Start Position (Centered on Source)
             chip.style.left = (fromRect.left + fromRect.width/2 - 15) + 'px';
             chip.style.top = (fromRect.top + fromRect.height/2 - 15) + 'px';
             document.body.appendChild(chip);
-            
-            // Force Reflow
             chip.getBoundingClientRect(); 
-            
-            // End Position (Centered on Target)
             chip.style.left = (toRect.left + toRect.width/2 - 15) + 'px';
             chip.style.top = (toRect.top + toRect.height/2 - 15) + 'px';
-            
-            // Remove after animation completes
             setTimeout(() => { chip.remove(); resolve(); }, 600);
         });
     }
