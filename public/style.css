@@ -1114,3 +1114,59 @@ button:active { transform: translateY(4px); box-shadow: none; }
 .seat.active .dealer-marker {
     border-color: var(--gold);
 }
+
+/* --- TARGETED FIX: 360px - 390px --- */
+@media (min-width: 360px) and (max-width: 390px) {
+    
+    .poker-table {
+        /* Requested Adjustments */
+        width: 88%;
+        height: 48%;
+        
+        /* Keep centering logic */
+        top: 37%; /* Adjusted slightly to center the new height */
+        transform: translate(-50%, -50%) scale(1); /* Reset scale since we are setting explicit % */
+        
+        /* Ensure border doesn't make it look too thick on mobile */
+        border-width: 4px; 
+    }
+
+    /* Adjust seat positions slightly to fit the new table boundaries */
+    .seat-1 { left: -8px; bottom: 15%; } /* Move side seats out slightly */
+    .seat-5 { right: -8px; bottom: 15%; }
+    
+    .seat-0 { bottom: -25px; } /* Push hero seat down slightly */
+    .seat-3 { top: -45px; }    /* Push villain seat up slightly */
+
+    /* Ensure Info Panel clears the taller table */
+    .info-panel {
+        bottom: 180px;
+    }
+
+    /* --- NEW CENTER AREA ADJUSTMENT --- */
+    .center-area {
+        position: absolute;
+        top: 32%; /* Moves the cards/pot higher up inside the table */
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 280px;
+        height: 160px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+    }
+
+    .deck-stack {
+        top: 100%; /* Keeps deck just below the cards */
+        transform: translate(-50%, 10px); /* Slightly tighter gap */
+    }
+
+    :root {
+        --card-w:  46px;  /* Slightly smaller cards */
+        --card-h:  64px;
+        --card-font: 0.7rem; /* Adjust font size accordingly */
+    }
+
+}
